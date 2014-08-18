@@ -103,7 +103,7 @@ class IOSPlatform implements IPlatformTool {
 		
 		for (dependency in project.dependencies) {
 			
-			if (!StringTools.endsWith (dependency.name, ".framework") && !StringTools.endsWith (dependency.path, ".framework")) {
+			if (!StringTools.endsWith (dependency.name, ".framework") && !StringTools.endsWith (dependency.path, ".framework") && !StringTools.endsWith (dependency.name, ".dylib") && !StringTools.endsWith (dependency.path, ".dylib")) {
 				
 				if (dependency.path != "") {
 					
@@ -257,6 +257,8 @@ class IOSPlatform implements IPlatformTool {
 
 		context.frameworkSearchPaths = [];
 
+		/* .framework dependencies */
+
 		for (dependency in project.dependencies) {
 			
 			var name = null;
@@ -289,6 +291,42 @@ class IOSPlatform implements IPlatformTool {
 			}
 			
 		}
+
+		/* .dylib dependencies */
+
+		for (dependency in project.dependencies) {
+			
+			var name = null;
+			var path = null;
+
+			if (Path.extension (dependency.name) == "dylib") {
+				
+				name = dependency.name;
+				path = "/usr/lib/" + dependency.name;
+
+			} else if (Path.extension (dependency.path) == "dylib") {
+				
+				name = Path.withoutDirectory (dependency.path);
+				path = PathHelper.tryFullPath (dependency.path);
+				
+			}
+
+			if (name != null) {
+				
+				var frameworkID = "11C0000000000018" + StringHelper.getUniqueID ();
+				var fileID = "11C0000000000018" + StringHelper.getUniqueID ();
+
+				ArrayHelper.addUnique (context.frameworkSearchPaths, Path.directory (path));
+
+				context.ADDL_PBX_BUILD_FILE += "		" + frameworkID + " /* " + name + " in Frameworks */ = {isa = PBXBuildFile; fileRef = " + fileID + " /* " + name + " */; };\n";
+				context.ADDL_PBX_FILE_REFERENCE += "		" + fileID + " /* " + name + " */ = {isa = PBXFileReference; lastKnownFileType = compiled.mach-o.dylib; name = " + name + "; path = " + path + "; sourceTree = SDKROOT; };\n";
+				context.ADDL_PBX_FRAMEWORKS_BUILD_PHASE += "				" + frameworkID + " /* " + name + " in Frameworks */,\n";
+				context.ADDL_PBX_FRAMEWORK_GROUP += "				" + fileID + " /* " + name + " */,\n";
+				
+			}
+			
+		}
+
 		
 		context.HXML_PATH = PathHelper.findTemplate (project.templatePaths, "iphone/PROJ/haxe/Build.hxml");
 		context.PRERENDERED_ICON = project.config.ios.prerenderedIcon;
